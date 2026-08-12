@@ -1,0 +1,12 @@
+// Fuente de verdad del esquema de base de datos.
+// Los modelos se agregan en la Fase 1, siguiendo docs/modelo-datos-torneos-saas.md.
+// No se edita a mano fuera de una migración (Prisma Migrate).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

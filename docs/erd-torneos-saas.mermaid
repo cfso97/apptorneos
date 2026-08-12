@@ -1,0 +1,571 @@
+erDiagram
+
+    %% ==================== IDENTIDAD Y ORGANIZACIONES ====================
+    USERS {
+        uuid id PK
+        string email
+        string password_hash
+        string nombre
+        date fecha_nacimiento
+        json perfil_publico
+        datetime created_at
+    }
+
+    ORGANIZATIONS {
+        uuid id PK
+        string nombre
+        string tipo
+        uuid plan_id FK
+        string prefijo_codigo_jugador
+        int siguiente_secuencia
+        datetime created_at
+    }
+
+    MEMBERSHIPS {
+        uuid id PK
+        uuid user_id FK
+        uuid organization_id FK
+        string rol
+        string estado
+        string codigo_jugador
+        date fecha_ingreso
+    }
+
+    PERMISSIONS {
+        string codigo PK
+        string modulo
+    }
+
+    ROLE_PERMISSIONS {
+        string rol FK
+        string permission_codigo FK
+    }
+
+    USER_GUARDIANS {
+        uuid id PK
+        uuid minor_user_id FK
+        uuid guardian_user_id FK
+        string relacion
+        boolean es_responsable_pagos
+        boolean es_contacto_emergencia
+    }
+
+    AUDIT_LOG {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        string entidad_tipo
+        uuid entidad_id
+        string accion
+        json valores_anteriores
+        json valores_nuevos
+        datetime fecha
+    }
+
+    %% ==================== DEPORTES Y EQUIPOS ====================
+    SPORTS {
+        uuid id PK
+        string nombre
+        string tipo_participacion
+        boolean maneja_sets
+        string unidad_resultado
+        json config_default
+    }
+
+    TEAMS {
+        uuid id PK
+        string nombre
+        string escudo
+        uuid sport_id FK
+        uuid coach_principal_id FK
+        uuid organizacion_origen_id FK
+        datetime created_at
+    }
+
+    TEAM_COACHES {
+        uuid team_id FK
+        uuid user_id FK
+        string rol
+    }
+
+    TEAM_MEMBERS {
+        uuid team_id FK
+        uuid user_id FK
+        string estado
+        string posicion
+        string numero
+    }
+
+    TEAM_ORGANIZATION_LINKS {
+        uuid team_id FK
+        uuid organization_id FK
+        string tipo_relacion
+        date fecha_vinculacion
+    }
+
+    TEAM_CREATION_INVITATIONS {
+        uuid id PK
+        uuid organization_id FK
+        uuid invited_user_id FK
+        uuid tournament_id FK
+        string estado
+        uuid equipo_resultante_id FK
+        datetime created_at
+    }
+
+    %% ==================== TORNEOS: ESTRUCTURA ====================
+    TOURNAMENTS {
+        uuid id PK
+        uuid organization_id FK
+        uuid sport_id FK
+        string nombre
+        date fecha_inicio
+        date fecha_fin
+        string estado
+    }
+
+    TOURNAMENT_CATEGORIES {
+        uuid id PK
+        uuid tournament_id FK
+        string nombre
+        string genero
+        int edad_min
+        int edad_max
+        string modalidad
+    }
+
+    TOURNAMENT_PHASES {
+        uuid id PK
+        uuid tournament_id FK
+        string nombre
+        int orden
+        string formato
+        uuid fase_padre_id FK
+        json config
+    }
+
+    PHASE_TRANSITION_RULES {
+        uuid id PK
+        uuid fase_origen_id FK
+        uuid fase_destino_id FK
+        string criterio
+        json valor
+        int orden_prioridad
+    }
+
+    SEEDING_RULES {
+        uuid id PK
+        uuid tournament_phase_id FK
+        string metodo
+        string patron_siembra
+        json config
+    }
+
+    BRACKET_SEED_ASSIGNMENTS {
+        uuid id PK
+        uuid tournament_phase_id FK
+        string participante_tipo
+        uuid participante_id
+        int posicion_semilla
+        uuid origen_grupo
+        string metodo_asignacion
+    }
+
+    TOURNAMENT_FIELDS {
+        uuid id PK
+        uuid tournament_id FK
+        string nombre
+        int orden
+        uuid court_id FK
+        boolean activo
+    }
+
+    %% ==================== REQUISITOS DE ELEGIBILIDAD ====================
+    REQUIREMENT_TYPES {
+        uuid id PK
+        string codigo
+        string nombre_visible
+        string tipo_dato
+        boolean validable_automaticamente
+        uuid requiere_modulo FK
+        json config_schema
+    }
+
+    TOURNAMENT_CATEGORY_REQUIREMENTS {
+        uuid id PK
+        uuid tournament_category_id FK
+        uuid requirement_type_id FK
+        boolean habilitado
+        json config_valores
+        boolean obligatorio
+        int orden_visualizacion
+    }
+
+    %% ==================== INSCRIPCIONES ====================
+    TOURNAMENT_REGISTRATIONS {
+        uuid id PK
+        uuid tournament_category_id FK
+        string participante_tipo
+        uuid user_id FK
+        uuid team_id FK
+        string estado
+        json requisitos_validados
+        datetime fecha_inscripcion
+    }
+
+    TOURNAMENT_REGISTRATION_ROSTER {
+        uuid id PK
+        uuid tournament_registration_id FK
+        uuid user_id FK
+        string numero_camiseta
+        string posicion
+        string estado
+    }
+
+    %% ==================== PARTIDOS Y RESULTADOS ====================
+    MATCHES {
+        uuid id PK
+        uuid tournament_phase_id FK
+        int ronda
+        string grupo
+        string bracket_tipo
+        string participante_a_tipo
+        uuid participante_a_id
+        string participante_b_tipo
+        uuid participante_b_id
+        int resultado_a
+        int resultado_b
+        int penales_a
+        int penales_b
+        string estado
+        uuid tournament_field_id FK
+        uuid match_siguiente_ganador_id FK
+        string slot_en_siguiente_ganador
+        uuid match_siguiente_perdedor_id FK
+        string slot_en_siguiente_perdedor
+        uuid resultado_confirmado_por_a FK
+        uuid resultado_confirmado_por_b FK
+        datetime fecha_hora
+    }
+
+    MATCH_DISPUTES {
+        uuid id PK
+        uuid match_id FK
+        uuid reportado_por_user_id FK
+        string motivo
+        string estado
+        uuid resolucion_admin_id FK
+        datetime fecha
+    }
+
+    STANDINGS {
+        uuid tournament_phase_id FK
+        string participante_tipo
+        uuid participante_id
+        int partidos_jugados
+        int puntos
+        float puntos_promedio
+        int diferencia_gol
+        datetime updated_at
+    }
+
+    PLAYER_SANCTIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid tournament_id FK
+        uuid match_id FK
+        string tipo
+        string descripcion
+        date fecha
+    }
+
+    %% ==================== ESTATUS, DESCALIFICACIÓN Y REEMPLAZO ====================
+    TOURNAMENT_DISQUALIFICATIONS {
+        uuid id PK
+        uuid tournament_registration_id FK
+        uuid tournament_phase_id FK
+        string motivo
+        string descripcion
+        date fecha
+        uuid reemplazado_por_registration_id FK
+        string estado
+    }
+
+    BRACKET_SUBSTITUTIONS {
+        uuid id PK
+        uuid tournament_phase_id FK
+        uuid match_id FK
+        string participante_saliente_tipo
+        uuid participante_saliente_id
+        string participante_entrante_tipo
+        uuid participante_entrante_id
+        uuid disqualification_id FK
+        date fecha
+    }
+
+    %% ==================== ESTADÍSTICAS ====================
+    MATCH_EVENTS {
+        uuid id PK
+        uuid match_id FK
+        uuid user_id FK
+        uuid team_id FK
+        string tipo
+        int minuto
+        datetime created_at
+    }
+
+    PLAYER_TOURNAMENT_STATS {
+        uuid tournament_id FK
+        uuid user_id FK
+        int partidos_jugados
+        int goles
+        int asistencias
+        int tarjetas_amarillas
+        int tarjetas_rojas
+        datetime updated_at
+    }
+
+    TEAM_TOURNAMENT_STATS {
+        uuid tournament_id FK
+        uuid team_id FK
+        int partidos_jugados
+        int ganados
+        int empatados
+        int perdidos
+        int goles_favor
+        int goles_contra
+        datetime updated_at
+    }
+
+    %% ==================== CARNET DE JUGADOR ====================
+    PLAYER_CREDENTIALS {
+        uuid id PK
+        uuid user_id FK
+        uuid tournament_registration_id FK
+        string codigo_qr
+        string estado
+        date fecha_emision
+        date fecha_expiracion
+    }
+
+    %% ==================== ÁRBITROS ====================
+    REFEREES {
+        uuid id PK
+        uuid user_id FK
+        uuid organization_id FK
+        string nombre
+        string telefono
+        boolean es_usuario_registrado
+    }
+
+    MATCH_REFEREES {
+        uuid match_id FK
+        uuid referee_id FK
+        string rol
+    }
+
+    %% ==================== HOJA DE VIDA DEL JUGADOR ====================
+    ACHIEVEMENTS {
+        uuid id PK
+        uuid user_id FK
+        uuid organization_id FK
+        uuid tournament_id FK
+        string tipo
+        date fecha
+    }
+
+    PLAYER_TIMELINE {
+        uuid id PK
+        uuid user_id FK
+        uuid organization_id FK
+        string tipo_evento
+        uuid referencia_id
+        date fecha
+        json metadata
+    }
+
+    USER_PROFILE_SUMMARY {
+        uuid user_id PK
+        int total_torneos
+        int total_victorias
+        int total_organizaciones
+        json logros_destacados
+        datetime updated_at
+    }
+
+    %% ==================== FINANZAS DE TORNEO ====================
+    TOURNAMENT_TRANSACTIONS {
+        uuid id PK
+        uuid tournament_id FK
+        uuid organization_id FK
+        uuid user_id FK
+        uuid team_id FK
+        string tipo
+        string concepto
+        decimal monto
+        string moneda
+        string estado
+        string metodo_registro
+        uuid registrado_por FK
+        uuid transaccion_relacionada_id FK
+        date fecha
+    }
+
+    TOURNAMENT_FINANCE_SUMMARY {
+        uuid tournament_id PK
+        decimal total_recaudado
+        decimal total_pendiente
+        decimal total_multas
+        decimal total_pagos_arbitraje
+        datetime updated_at
+    }
+
+    %% ==================== PLANES Y MÓDULOS (SAAS) ====================
+    PLANS {
+        uuid id PK
+        string nombre
+        decimal precio_base
+    }
+
+    MODULES {
+        uuid id PK
+        string nombre
+        decimal precio_adicional
+    }
+
+    PLAN_DEFAULT_MODULES {
+        uuid plan_id FK
+        uuid module_id FK
+    }
+
+    ORGANIZATION_MODULES {
+        uuid organization_id FK
+        uuid module_id FK
+        boolean activo
+        date fecha_activacion
+    }
+
+    ORGANIZATION_LIMITS {
+        uuid organization_id PK
+        int max_jugadores
+        int max_equipos
+        int max_torneos_activos
+        int max_canchas
+    }
+
+    %% ==================== MÓDULOS FUTUROS (namespacing reservado) ====================
+    SCHOOL_ACCOUNTS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        string tipo
+        string periodo
+        decimal monto
+        string estado
+    }
+
+    COURTS {
+        uuid id PK
+        uuid organization_id FK
+        string nombre
+        decimal costo_hora
+    }
+
+    COURT_BOOKINGS {
+        uuid id PK
+        uuid court_id FK
+        datetime fecha_hora_inicio
+        datetime fecha_hora_fin
+        uuid match_id FK
+        string estado
+    }
+
+    %% ==================== RELACIONES ====================
+    ORGANIZATIONS }o--|| PLANS : contrata
+    USERS ||--o{ MEMBERSHIPS : tiene
+    ORGANIZATIONS ||--o{ MEMBERSHIPS : tiene
+    ROLE_PERMISSIONS }o--|| PERMISSIONS : otorga
+    USERS ||--o{ USER_GUARDIANS : es_menor
+    USERS ||--o{ USER_GUARDIANS : es_acudiente
+    ORGANIZATIONS ||--o{ AUDIT_LOG : registra_actividad
+    USERS ||--o{ AUDIT_LOG : ejecuta_accion
+
+    SPORTS ||--o{ TEAMS : clasifica
+    USERS ||--o{ TEAM_COACHES : administra
+    TEAMS ||--o{ TEAM_COACHES : tiene
+    USERS ||--o{ TEAM_MEMBERS : pertenece_a
+    TEAMS ||--o{ TEAM_MEMBERS : tiene_plantilla
+    TEAMS ||--o{ TEAM_ORGANIZATION_LINKS : vinculado_a
+    ORGANIZATIONS ||--o{ TEAM_ORGANIZATION_LINKS : recibe_equipo
+    ORGANIZATIONS ||--o{ TEAM_CREATION_INVITATIONS : invita
+    USERS ||--o{ TEAM_CREATION_INVITATIONS : recibe_invitacion
+    TEAM_CREATION_INVITATIONS ||--o| TEAMS : origina
+
+    SPORTS ||--o{ TOURNAMENTS : define_reglas
+    ORGANIZATIONS ||--o{ TOURNAMENTS : organiza
+    TOURNAMENTS ||--o{ TOURNAMENT_CATEGORIES : contiene
+    TOURNAMENT_CATEGORIES ||--o{ TOURNAMENT_CATEGORY_REQUIREMENTS : configura
+    REQUIREMENT_TYPES ||--o{ TOURNAMENT_CATEGORY_REQUIREMENTS : cataloga
+
+    TOURNAMENTS ||--o{ TOURNAMENT_PHASES : se_divide_en
+    TOURNAMENT_PHASES ||--o{ TOURNAMENT_PHASES : fase_padre
+    TOURNAMENT_PHASES ||--o{ PHASE_TRANSITION_RULES : origen_de
+    TOURNAMENT_PHASES ||--o{ SEEDING_RULES : configura_siembra
+    TOURNAMENT_PHASES ||--o{ BRACKET_SEED_ASSIGNMENTS : asigna_semillas
+    TOURNAMENTS ||--o{ TOURNAMENT_FIELDS : define_campos
+    TOURNAMENT_FIELDS ||--o{ MATCHES : aloja
+
+    TOURNAMENT_CATEGORIES ||--o{ TOURNAMENT_REGISTRATIONS : recibe_inscripciones
+    USERS ||--o{ TOURNAMENT_REGISTRATIONS : se_inscribe_individual
+    TEAMS ||--o{ TOURNAMENT_REGISTRATIONS : se_inscribe_equipo
+    TOURNAMENT_REGISTRATIONS ||--o{ TOURNAMENT_REGISTRATION_ROSTER : convoca
+    USERS ||--o{ TOURNAMENT_REGISTRATION_ROSTER : es_convocado
+
+    TOURNAMENT_PHASES ||--o{ MATCHES : programa
+    TOURNAMENT_PHASES ||--o{ STANDINGS : calcula_tabla
+    MATCHES ||--o{ PLAYER_SANCTIONS : genera
+    USERS ||--o{ PLAYER_SANCTIONS : recibe_sancion
+    MATCHES ||--o{ MATCH_DISPUTES : puede_ser_disputado
+    USERS ||--o{ MATCH_DISPUTES : reporta
+
+    TOURNAMENT_REGISTRATIONS ||--o{ TOURNAMENT_DISQUALIFICATIONS : puede_ser_descalificada
+    TOURNAMENT_PHASES ||--o{ TOURNAMENT_DISQUALIFICATIONS : ocurre_en
+    TOURNAMENT_DISQUALIFICATIONS ||--o| BRACKET_SUBSTITUTIONS : genera_reemplazo
+    MATCHES ||--o{ BRACKET_SUBSTITUTIONS : afectado_por
+
+    MATCHES ||--o{ MATCH_EVENTS : registra
+    USERS ||--o{ MATCH_EVENTS : ejecuta
+    TEAMS ||--o{ MATCH_EVENTS : a_favor_de
+    TOURNAMENTS ||--o{ PLAYER_TOURNAMENT_STATS : agrega
+    USERS ||--o{ PLAYER_TOURNAMENT_STATS : acumula
+    TOURNAMENTS ||--o{ TEAM_TOURNAMENT_STATS : agrega
+    TEAMS ||--o{ TEAM_TOURNAMENT_STATS : acumula
+
+    USERS ||--o{ PLAYER_CREDENTIALS : posee
+    TOURNAMENT_REGISTRATIONS ||--o{ PLAYER_CREDENTIALS : emite_carnet
+
+    MATCHES ||--o{ MATCH_REFEREES : asigna
+    REFEREES ||--o{ MATCH_REFEREES : arbitra
+    ORGANIZATIONS ||--o{ REFEREES : registra
+    USERS |o--o| REFEREES : opcionalmente_es
+
+    USERS ||--o{ ACHIEVEMENTS : obtiene
+    ORGANIZATIONS ||--o{ ACHIEVEMENTS : otorga
+    USERS ||--o{ PLAYER_TIMELINE : construye_historial
+    USERS ||--|| USER_PROFILE_SUMMARY : resume_en
+
+    TOURNAMENTS ||--o{ TOURNAMENT_TRANSACTIONS : registra_movimiento
+    USERS ||--o{ TOURNAMENT_TRANSACTIONS : paga_o_debe
+    TOURNAMENTS ||--|| TOURNAMENT_FINANCE_SUMMARY : resume_finanzas
+
+    PLANS ||--o{ PLAN_DEFAULT_MODULES : incluye
+    MODULES ||--o{ PLAN_DEFAULT_MODULES : incluido_en_plan
+    ORGANIZATIONS ||--o{ ORGANIZATION_MODULES : activa_modulo
+    MODULES ||--o{ ORGANIZATION_MODULES : activado_por
+    ORGANIZATIONS ||--|| ORGANIZATION_LIMITS : tiene_limites
+
+    ORGANIZATIONS ||--o{ SCHOOL_ACCOUNTS : futuro_gestiona
+    ORGANIZATIONS ||--o{ COURTS : futuro_registra
+    COURTS ||--o{ COURT_BOOKINGS : futuro_reserva
+    MATCHES |o--o| COURT_BOOKINGS : futuro_ocupa
+    COURTS ||--o| TOURNAMENT_FIELDS : futuro_vincula

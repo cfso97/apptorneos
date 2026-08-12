@@ -1,0 +1,14 @@
+{
+  "name": "@torneos-saas/shared",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "lint": "echo \"(sin lint configurado todavía)\"",
+    "test": "echo \"(sin tests todavía)\""
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
