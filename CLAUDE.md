@@ -183,6 +183,10 @@ No implementes lógica de una fase posterior antes de que la anterior esté comp
 
 **Si al implementar algo te desvías de lo documentado en `/docs`** (agregas un campo no previsto, cambias un endpoint, tomas una decisión distinta a la anotada), **actualiza el documento correspondiente en el mismo cambio** — no lo dejes pendiente. La documentación en `/docs` debe reflejar siempre el estado real del sistema, no solo el diseño original.
 
+## Control de versiones — commits
+
+Los mensajes de commit y de Pull Request **no deben incluir líneas de atribución a Claude** (ni "Co-Authored-By: Claude", ni "Generated with Claude Code", ni similares). Los commits se firman solo con el autor real (el usuario de git configurado).
+
 ## Cómo trabajar conmigo (el usuario del proyecto)
 
 No tengo experiencia profunda escribiendo código. Antes de hacer cambios:
