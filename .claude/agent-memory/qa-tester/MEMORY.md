@@ -1,0 +1,2 @@
+- [Convenciones de test del backend](backend_test_conventions.md) — naming de archivos spec/e2e y estilo de import de supertest en este repo.
+- [Cobertura razonable para health check](health_check_test_coverage.md) — criterio de cobertura mínima para endpoints triviales en Fase 0, sin inventar casos de negocio.
