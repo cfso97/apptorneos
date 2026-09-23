@@ -44,6 +44,9 @@ Toda la documentación vive en `/docs`. Consúltala siempre antes de tomar decis
 - **Monorepo en GitHub**, gestionado con **pnpm workspaces + Turborepo** (cachea builds, corre solo las tareas de lo que cambió) — backend, frontend web y (cuando corresponda) app móvil en un solo repositorio, mientras el equipo sea pequeño.
 - Estructura de carpetas: ver sección "Estructura del proyecto" más abajo.
 - Branching: `main` + `develop` + feature branches. Protección en `main`: PR obligatorio + al menos 1 review.
+  - Nadie commitea directo en `main` ni en `develop`. Cada tarea vive en su propia rama creada desde `develop` (ej. `feature/auth-recuperar-password`, `feature/vista-login`) y se integra vía PR hacia `develop`.
+  - `main` solo se actualiza desde `develop` cuando el equipo acuerda que está estable — nunca al revés.
+  - Equipo actual: Alejandro lleva diseño (Figma) y frontend web (`apps/web`); Cristian lleva backend (`apps/backend`). El contrato de la API (`docs/api-referencia-rapida.md` y, cuando exista, `docs/api-openapi-torneos.yaml`) es lo que permite que ambos avancen en paralelo sin bloquearse.
 - **GitHub Actions** para CI/CD: lint → tests → build en cada PR, bloquea merge si falla. Turborepo permite que el pipeline solo reconstruya/pruebe los paquetes afectados por el cambio, no todo el monorepo.
 
 **Observabilidad (agregar cuando haya usuarios reales, no bloquea el MVP):** Sentry para errores, Datadog o Grafana+Prometheus para métricas/APM — con capacidad de filtrar por `organization_id` para diagnosticar si un problema es de un solo cliente o del sistema completo.
