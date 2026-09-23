@@ -1,5 +1,9 @@
 // Fuente de verdad del esquema de base de datos.
-// Los modelos se agregan en la Fase 1, siguiendo docs/modelo-datos-torneos-saas.md.
+// Refleja docs/modelo-datos-torneos-saas.md y docs/erd-torneos-saas.mermaid.
+// Fase 0 (Fundacional): identidad global de usuario, catálogos semilla
+// (permissions/role_permissions, plans, sports) y tablas de soporte de auth
+// (refresh_tokens, password_reset_tokens). Los modelos de organizaciones,
+// membresías y el resto del dominio se agregan a partir de la Fase 1.
 // No se edita a mano fuera de una migración (Prisma Migrate).
 
 generator client {
@@ -9,4 +13,102 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// Identidad global de cualquier persona en el sistema (jugador, coach, admin).
+/// Sin organization_id — la pertenencia a una organización vive en `memberships`
+/// (Fase 1), no como propiedad fija del usuario.
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  nombre          String
+  fechaNacimiento DateTime  @map("fecha_nacimiento") @db.Date
+  perfilPublico   Json?     @map("perfil_publico")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+/// Catálogo de acciones del sistema. Evita `if (rol === 'admin')` disperso en
+/// el código — el guard/decorator centralizado (`@RequierePermiso`, Fase 1)
+/// consulta esta tabla y `role_permissions`.
+model Permission {
+  codigo String @id
+  modulo String
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+/// Qué rol tiene cada permiso por defecto (matriz de la sección 16.1 de
+/// modelo-datos-torneos-saas.md).
+model RolePermission {
+  rol              String
+  permissionCodigo String @map("permission_codigo")
+
+  permission Permission @relation(fields: [permissionCodigo], references: [codigo], onDelete: Cascade)
+
+  @@id([rol, permissionCodigo])
+  @@map("role_permissions")
+}
+
+/// Plan base contratado por una organización (control interno en el MVP, sin
+/// pasarela de pago activa — ver sección 17 de modelo-datos-torneos-saas.md).
+model Plan {
+  id         String  @id @default(uuid()) @db.Uuid
+  nombre     String
+  precioBase Decimal @map("precio_base") @db.Decimal(10, 2)
+
+  @@map("plans")
+}
+
+/// Catálogo de deportes soportados. Agregar un deporte nuevo es una fila, no
+/// una migración (sección 4 de modelo-datos-torneos-saas.md).
+model Sport {
+  id                String  @id @default(uuid()) @db.Uuid
+  nombre            String
+  tipoParticipacion String  @map("tipo_participacion")
+  manejaSets        Boolean @default(false) @map("maneja_sets")
+  unidadResultado   String  @map("unidad_resultado")
+  configDefault     Json?   @map("config_default")
+
+  @@map("sports")
+}
+
+/// Tabla de soporte de autenticación (no documentada en el ERD original,
+/// agregada en Fase 0): permite invalidar sesiones en /auth/logout, rotar
+/// tokens en /auth/refresh y detectar reuso de un refresh token robado.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// Tabla de soporte de autenticación (no documentada en el ERD original,
+/// agregada en Fase 0): sostiene el flujo de "¿Olvidó su contraseña?".
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

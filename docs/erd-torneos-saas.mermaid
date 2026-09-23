@@ -41,6 +41,24 @@ erDiagram
         string permission_codigo FK
     }
 
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid user_id FK
+        string token_hash
+        datetime expires_at
+        datetime revoked_at
+        datetime created_at
+    }
+
+    PASSWORD_RESET_TOKENS {
+        uuid id PK
+        uuid user_id FK
+        string token_hash
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
     USER_GUARDIANS {
         uuid id PK
         uuid minor_user_id FK
@@ -485,6 +503,8 @@ erDiagram
     USERS ||--o{ MEMBERSHIPS : tiene
     ORGANIZATIONS ||--o{ MEMBERSHIPS : tiene
     ROLE_PERMISSIONS }o--|| PERMISSIONS : otorga
+    USERS ||--o{ REFRESH_TOKENS : mantiene_sesion
+    USERS ||--o{ PASSWORD_RESET_TOKENS : solicita_recuperacion
     USERS ||--o{ USER_GUARDIANS : es_menor
     USERS ||--o{ USER_GUARDIANS : es_acudiente
     ORGANIZATIONS ||--o{ AUDIT_LOG : registra_actividad

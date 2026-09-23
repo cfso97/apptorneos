@@ -47,8 +47,10 @@ Estos cinco patrones se repiten a lo largo de todo el modelo — entenderlos aqu
 | `organizations` | El tenant — escuela, club, liga, organizador de torneos. |
 | `memberships` | Relación N:N entre usuario y organización, con rol y estado. Aquí sí vive el aislamiento multi-tenant (RLS de Postgres filtra por `organization_id` a través de esta tabla y de lo que cuelga de ella). |
 | `permissions` / `role_permissions` | Catálogo de acciones del sistema y qué rol las tiene por defecto. Evita `if (rol === 'admin')` regado por el código. |
+| `refresh_tokens` | Soporte de autenticación (Fase 0, agregada durante la implementación — no estaba en el diseño original). Un registro por sesión activa: permite invalidar sesiones puntuales en `/auth/logout`, rotar el token en cada `/auth/refresh` y detectar el reuso de un token ya revocado (señal de robo), revocando en ese caso todas las sesiones del usuario. Guarda `token_hash` (nunca el token en texto plano). |
+| `password_reset_tokens` | Soporte de autenticación (Fase 0, agregada durante la implementación). Sostiene el flujo de "¿Olvidó su contraseña?": un token opaco de un solo uso (`used_at`), con expiración, que al consumirse en `/auth/reset-password` revoca además todos los `refresh_tokens` activos del usuario (cierre de sesión en todos los dispositivos). |
 
-**Auth:** JWT lleva solo `user_id`. Cada request que toca datos de una organización especifica `organization_id` (URL/header) y el backend valida contra `memberships` el acceso y el rol vigente.
+**Auth:** JWT lleva solo `user_id`. Cada request que toca datos de una organización especifica `organization_id` (URL/header) y el backend valida contra `memberships` el acceso y el rol vigente. El JWT de acceso es de corta duración (`JWT_ACCESS_EXPIRES_IN`, ~15 min) — la sesión se mantiene renovando vía `/auth/refresh` con el refresh token opaco (`JWT_REFRESH_EXPIRES_IN`, ~30 días), que vive hasheado en `refresh_tokens`.
 
 ---
 

@@ -14,8 +14,12 @@
 |---|---|---|---|
 | POST | `/auth/register` | público | Crear cuenta de usuario |
 | POST | `/auth/login` | público | Login, devuelve JWT + refresh token |
-| POST | `/auth/refresh` | público (requiere refresh token válido) | Renovar JWT |
-| POST | `/auth/logout` | autenticado | Invalidar refresh token |
+| POST | `/auth/refresh` | público (requiere refresh token válido) | Renovar JWT (rota el refresh token; detecta y responde a reuso de un token ya revocado revocando todas las sesiones del usuario) |
+| POST | `/auth/logout` | autenticado | Invalidar el refresh token indicado en el body |
+| POST | `/auth/forgot-password` | público | Solicitar recuperación de contraseña — responde siempre el mismo mensaje genérico, exista o no el email. En desarrollo (sin envío de email real todavía), el link queda en el log del servidor |
+| POST | `/auth/reset-password` | público (requiere token de recuperación válido) | Fijar nueva contraseña con el token recibido; cierra sesión en todos los dispositivos (revoca todos los refresh tokens activos) |
+
+**Pendiente (sin fecha):** login/registro con Google ("Continuar con Google"), como método adicional dentro de este mismo módulo — vía Passport (`passport-google-oauth20`) contra la misma tabla `users`, reutilizando el mismo `accessToken`/`refreshToken` ya emitido por `/auth/login`. No depende de Supabase Auth ni de ningún proveedor de identidad externo, para no partir la identidad del usuario entre dos sistemas. Se aborda junto con la construcción de las pantallas reales de login/register en el panel web.
 
 ---
 

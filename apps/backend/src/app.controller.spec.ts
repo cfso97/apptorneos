@@ -15,12 +15,14 @@ describe('AppController', () => {
   });
 
   describe('getHealth', () => {
-    it('devuelve el envelope {data, meta} con status "ok"', () => {
+    // El envelope {data, meta} lo agrega el ResponseInterceptor global (ver
+    // test/app.e2e.spec.ts) — este test unitario verifica el payload crudo
+    // que devuelve el controlador, antes de pasar por el interceptor.
+    it('devuelve status "ok"', () => {
       const result = controller.getHealth();
 
-      expect(result.meta).toEqual({});
-      expect(result.data.status).toBe('ok');
-      expect(result.data.timestamp).toEqual(expect.any(String));
+      expect(result.status).toBe('ok');
+      expect(result.timestamp).toEqual(expect.any(String));
     });
 
     it('devuelve un timestamp ISO 8601 válido y cercano al momento actual', () => {
@@ -28,11 +30,9 @@ describe('AppController', () => {
       const result = controller.getHealth();
       const after = Date.now();
 
-      const timestampMs = new Date(result.data.timestamp).getTime();
+      const timestampMs = new Date(result.timestamp).getTime();
 
-      expect(result.data.timestamp).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-      );
+      expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       expect(Number.isNaN(timestampMs)).toBe(false);
       expect(timestampMs).toBeGreaterThanOrEqual(before);
       expect(timestampMs).toBeLessThanOrEqual(after);

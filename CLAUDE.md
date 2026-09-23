@@ -74,9 +74,10 @@ torneos-saas/                          ← raíz del repositorio
 │   │   │   ├── main.ts
 │   │   │   ├── app.module.ts
 │   │   │   ├── common/                ← código transversal, no de negocio
+│   │   │   │   ├── prisma/            ← PrismaService/PrismaModule (@Global()), única conexión a la BD
 │   │   │   │   ├── guards/            ← RequierePermisoGuard, JwtAuthGuard
 │   │   │   │   ├── interceptors/      ← envelope de respuesta {data,meta}, audit log
-│   │   │   │   ├── decorators/        ← @RequierePermiso(), @CurrentUser()
+│   │   │   │   ├── decorators/        ← @RequierePermiso(), @Public(), @CurrentUser()
 │   │   │   │   └── filters/           ← manejo centralizado de errores
 │   │   │   └── modules/               ← un módulo NestJS por dominio de negocio
 │   │   │       ├── auth/

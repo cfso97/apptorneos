@@ -9,6 +9,30 @@ on:
 jobs:
   lint-test-build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: torneos_saas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U user -d torneos_saas"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://user:password@localhost:5432/torneos_saas
+      JWT_SECRET: ci-test-secret
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      PASSWORD_RESET_EXPIRES_IN: 1h
+      FRONTEND_URL: http://localhost:3000
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +50,14 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Generar Prisma Client
+        run: pnpm exec prisma generate
+        working-directory: apps/backend
+
+      - name: Aplicar migraciones (Prisma Migrate) contra el Postgres del job
+        run: pnpm exec prisma migrate deploy
+        working-directory: apps/backend
 
       - name: Test
         run: pnpm test
