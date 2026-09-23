@@ -8,9 +8,11 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="flex h-screen items-start bg-[var(--color-bg-canvas)] py-4 pl-4">
-      <BrandPanel />
-      <div className="flex h-full flex-1 items-center justify-center">
+    <div className="flex min-h-screen flex-col bg-[var(--color-bg-canvas)] lg:h-screen lg:flex-row lg:items-start lg:py-4 lg:pl-4">
+      <div className="hidden h-full flex-1 lg:flex">
+        <BrandPanel />
+      </div>
+      <div className="flex flex-1 flex-col lg:h-full lg:items-center lg:justify-center">
         <LoginForm />
       </div>
     </div>

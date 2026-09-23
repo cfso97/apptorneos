@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { MobileHero } from '@/components/auth/MobileHero';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { api, ApiError } from '@/lib/api';
@@ -37,8 +38,10 @@ export function LoginForm() {
     loginMutation.error instanceof ApiError ? loginMutation.error.message : loginMutation.error ? 'No pudimos conectar con el servidor.' : undefined;
 
   return (
-    <div className="flex w-[400px] flex-col items-start gap-[var(--spacing-3xl)]">
-      <div className="flex flex-col gap-[var(--spacing-sm)]">
+    <div className="flex w-full flex-1 flex-col gap-[var(--spacing-3xl)] px-[var(--spacing-2xl)] py-[var(--spacing-lg)] lg:w-[400px] lg:flex-none lg:px-0 lg:py-0">
+      <MobileHero className="lg:hidden" />
+
+      <div className="hidden flex-col gap-[var(--spacing-sm)] lg:flex">
         <h1 className="font-sans text-[28px] font-semibold leading-9 tracking-[-0.5px] text-[color:var(--color-text-primary)]">
           Inicia sesión
         </h1>
@@ -47,7 +50,7 @@ export function LoginForm() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex w-full flex-col gap-[var(--spacing-lg)]">
+      <form onSubmit={handleSubmit} className="flex w-full flex-1 flex-col gap-[var(--spacing-lg)] lg:flex-none">
         <TextField
           id="email"
           name="email"
@@ -92,6 +95,9 @@ export function LoginForm() {
           </Link>
         </div>
 
+        {/* En móvil este espaciador empuja las acciones al fondo, como en el diseño de Figma. En escritorio no aplica: el formulario ya está centrado. */}
+        <div className="flex-1 lg:hidden" />
+
         <div className="flex w-full flex-col items-center gap-[var(--spacing-md)] pt-[var(--spacing-md)]">
           <Button type="submit" isLoading={loginMutation.isPending}>
             {loginMutation.isPending ? 'Iniciando sesión…' : 'Iniciar sesión'}
@@ -103,14 +109,14 @@ export function LoginForm() {
             </Link>
           </div>
         </div>
-      </form>
 
-      <div className="flex w-full items-center gap-[var(--spacing-sm)] rounded-[var(--radius-lg)] border border-solid border-[color:var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-[var(--spacing-lg)] py-[var(--spacing-md)]">
-        <Image src="/icons/users.svg" alt="" width={20} height={20} />
-        <p className="flex-1 font-sans text-xs text-[color:var(--color-text-secondary)]">
-          ¿Te invitaron a un equipo? Abre el enlace que recibiste por correo o WhatsApp.
-        </p>
-      </div>
+        <div className="flex w-full items-center gap-[var(--spacing-sm)] rounded-[var(--radius-lg)] border border-solid border-[color:var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-[var(--spacing-lg)] py-[var(--spacing-md)] lg:mt-[var(--spacing-md)]">
+          <Image src="/icons/users.svg" alt="" width={20} height={20} />
+          <p className="flex-1 font-sans text-xs text-[color:var(--color-text-secondary)]">
+            ¿Te invitaron a un equipo? Abre el enlace que recibiste por correo o WhatsApp.
+          </p>
+        </div>
+      </form>
     </div>
   );
 }

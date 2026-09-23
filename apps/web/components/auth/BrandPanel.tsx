@@ -22,13 +22,13 @@ export function BrandPanel() {
 
       <div className="relative flex flex-col items-start gap-[var(--spacing-3xl)]">
         <div className="flex flex-col gap-1">
-          <p className="whitespace-nowrap font-sans text-5xl italic leading-[56px] tracking-[-1px] text-[color:var(--color-text-secondary)]">
+          <p className="font-sans text-5xl italic leading-[56px] tracking-[-1px] text-[color:var(--color-text-secondary)] 2xl:whitespace-nowrap">
             Organiza.
           </p>
-          <p className="whitespace-nowrap font-sans text-5xl font-medium italic leading-[56px] tracking-[-1px] text-[color:var(--color-text-primary)]">
+          <p className="font-sans text-5xl font-medium italic leading-[56px] tracking-[-1px] text-[color:var(--color-text-primary)] 2xl:whitespace-nowrap">
             Compite. Vive el marcador.
           </p>
-          <p className="w-[520px] font-sans text-base text-[color:var(--color-text-secondary)]">
+          <p className="w-full max-w-[520px] font-sans text-base text-[color:var(--color-text-secondary)]">
             Torneos, inscripciones, calendario y resultados en vivo para tu organización, en un solo lugar.
           </p>
         </div>

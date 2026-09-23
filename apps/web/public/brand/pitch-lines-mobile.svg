@@ -1,0 +1,13 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Pitch Lines" opacity="0.14" clip-path="url(#clip0_0_94)">
+<path id="Vector" d="M150 224C190.869 224 224 190.869 224 150C224 109.131 190.869 76 150 76C109.131 76 76 109.131 76 150C76 190.869 109.131 224 150 224Z" stroke="#C8F31D" stroke-width="1.5"/>
+<path id="Vector_2" d="M150 154C152.209 154 154 152.209 154 150C154 147.791 152.209 146 150 146C147.791 146 146 147.791 146 150C146 152.209 147.791 154 150 154Z" stroke="#C8F31D" stroke-width="1.5"/>
+<path id="Vector_3" d="M0 150H300" stroke="#C8F31D" stroke-width="1.5"/>
+<path id="Vector_4" d="M275.25 -150H24.75C11.4952 -150 0.75 -139.255 0.75 -126V426C0.75 439.255 11.4952 450 24.75 450H275.25C288.505 450 299.25 439.255 299.25 426V-126C299.25 -139.255 288.505 -150 275.25 -150Z" stroke="#C8F31D" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_94">
+<rect width="300" height="300" fill="white"/>
+</clipPath>
+</defs>
+</svg>
