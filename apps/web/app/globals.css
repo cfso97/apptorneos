@@ -28,6 +28,10 @@
   /* Color · bordes */
   --color-border-strong: #6b7465;
   --color-border-subtle: #23281f;
+  --color-border-danger: #ff5a4f;
+
+  /* Color · estado */
+  --color-text-danger: #ff5a4f;
 
   /* Radios */
   --radius-lg: 16px;

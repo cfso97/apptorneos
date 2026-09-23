@@ -59,6 +59,7 @@ export function LoginForm() {
           placeholder="Ej. nombre@club.com…"
           autoComplete="email"
           required
+          disabled={loginMutation.isPending}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -71,6 +72,7 @@ export function LoginForm() {
           placeholder="Tu contraseña…"
           autoComplete="current-password"
           required
+          disabled={loginMutation.isPending}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={errorMessage}
@@ -78,8 +80,9 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
+              disabled={loginMutation.isPending}
               aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-full)]"
+              className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Image src="/icons/eye.svg" alt="" width={20} height={20} />
             </button>
