@@ -1,3 +1,53 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Tokens del design system "OvniSport" (Figma). Se definen una sola vez
+ * aquí y se consumen en todo el código como var(--token) — así una pantalla
+ * nueva calcada de Figma no repite valores hardcodeados.
+ */
+:root {
+  /* Color · superficies */
+  --color-bg-canvas: #0a0c09;
+  --color-bg-surface: #121510;
+  --color-bg-input: #23281f;
+  --color-bg-brand: #c8f31d;
+  --color-bg-brand-muted: #2a3504;
+  --color-bg-inverse: #eef1ea;
+  --color-bg-live: #d92d22;
+
+  /* Color · texto */
+  --color-text-primary: #eef1ea;
+  --color-text-secondary: #b4bbae;
+  --color-text-tertiary: #8e9788;
+  --color-text-brand: #c8f31d;
+  --color-text-on-brand: #0a0c09;
+  --color-text-on-danger: #ffffff;
+
+  /* Color · bordes */
+  --color-border-strong: #6b7465;
+  --color-border-subtle: #23281f;
+
+  /* Radios */
+  --radius-lg: 16px;
+  --radius-2xl: 32px;
+  --radius-full: 999px;
+
+  /* Espaciado */
+  --spacing-2xs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 40px;
+  --spacing-5xl: 48px;
+}
+
+body {
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
