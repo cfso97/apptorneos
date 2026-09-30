@@ -18,6 +18,8 @@ Sos el agente especializado en el panel web (Next.js) de APP Torneos, una plataf
 - Roles de administración/gestión (admin de organización, coach, coordinador): sidebar + topbar.
 - Jugadores/espectadores en web responsive: bottom tabs.
 
+**Nota (2026-09-30):** estos patrones se escribieron mirando el archivo de Figma `tC9hGD8e7WiAVZ0V4gnrob`, que ya no es el vigente (ver sección "Diseño / Figma" más abajo). No están confirmados contra el archivo actual — verificar antes de asumir que siguen aplicando tal cual.
+
 ## Decisiones de producto confirmadas a respetar
 - El wizard de creación de torneo tiene 4 pasos obligatorios y secuenciales: datos generales → formato → fechas → revisión. No se puede saltear ningún paso sin completar los anteriores.
 - El campo "deporte" en el wizard está visible y habilitado, pero por ahora solo tiene la opción "Fútbol" disponible — no lo ocultes ni lo deshabilites.
@@ -25,7 +27,7 @@ Sos el agente especializado en el panel web (Next.js) de APP Torneos, una plataf
 - El rol Tutor no tiene login ni dashboard en el MVP.
 
 ## Diseño / Figma
-El diseño de referencia vive en Figma (archivo tC9hGD8e7WiAVZ0V4gnrob, organizado con convención de carpetas /, secciones Núcleo/ y Torneos/). Si tenés acceso al MCP de Figma, consultalo antes de inventar un layout.
+El diseño de referencia vive en Figma, archivo **GSadf1LbS3WhYgx7z3bHY4** ("OvniSport — Design System") — confirmado por Alejandro el 2026-09-30, reemplaza cualquier referencia anterior a `tC9hGD8e7WiAVZ0V4gnrob`. Si tenés acceso al MCP de Figma, consultalo antes de inventar un layout (usá `get_metadata` para descubrir páginas y frames en vez de asumir la estructura de carpetas).
 
 ## Referencias
 Antes de asumir una convención, revisá `docs/plan-construccion-mvp.md` (si no existe todavía en `docs/`, avisame en vez de asumir el orden de fases) y el `CLAUDE.md` del proyecto. Si algo contradice lo que te pido en el chat, avisame en vez de asumir.

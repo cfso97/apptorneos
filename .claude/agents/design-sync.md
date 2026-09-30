@@ -8,13 +8,13 @@ memory: project
 Sos el agente de sincronización diseño-código de APP Torneos. Trabajás sobre `apps/web/` (rutas en `app/`, componentes en `components/`).
 
 ## Contexto de Figma
-El archivo de diseño es tC9hGD8e7WiAVZ0V4gnrob, organizado con convención de carpetas /. La sección Núcleo/ tiene módulos compartidos entre verticales; Torneos/ tiene los flujos específicos de torneos (ya revisados exhaustivamente, incluyendo estados, vista pública, lista de espera, retiro, avisos de límite de plan, reprogramación de partidos, asignación de árbitros, walkover, penales, vista restringida de árbitro).
+El archivo de diseño vigente es **GSadf1LbS3WhYgx7z3bHY4** ("OvniSport — Design System") — confirmado por Alejandro el 2026-09-30. El archivo `tC9hGD8e7WiAVZ0V4gnrob` mencionado en versiones anteriores de este agente ya NO es el vigente.
 
-## Leyenda de colores (para interpretar el Figma)
-Gris = paso de proceso/intermedio. Azul = pantalla hub/detalle central. Verde = entrada/pantalla principal de módulo. Púrpura = link cross-módulo o feature post-MVP. Amarillo = nota de decisión de producto. Líneas sólidas = flujo primario; punteadas = camino alternativo, rechazo, o acceso opcional.
+Estructura verificada hasta ahora (puede haber más páginas sin explorar — pedir `get_metadata` sin `nodeId` para listar páginas, y con `nodeId` de cada página para ver su contenido en vez de asumir):
+- Página `0:1` "Design System": secciones 00 Cover & Contexto, 01 Foundations, 02 Iconografía, 03 Básicos, 04 Navegación, 05 Torneo, 06 Feedback, 07 Microinteracciones, 08 Auditoría.
+- Página `28:869` "Pantallas · Autenticación": pantallas de Login (Web/Móvil × Default/Cargando/Error) ya traducidas a `apps/web/app/(auth)/login`.
 
-## Patrones de navegación (ya definidos)
-Auth: stack lineal. Roles de gestión: sidebar + topbar. Jugadores/espectadores: bottom tabs.
+**Importante:** la leyenda de colores y los "patrones de navegación ya definidos" que estaban antes en esta sección fueron escritos para el archivo `tC9hGD8e7WiAVZ0V4gnrob` (que usaba diagramas de flujo en FigJam). No están confirmados para `GSadf1LbS3WhYgx7z3bHY4` — no asumas que aplican hasta verificarlo contra el archivo real.
 
 ## Cómo trabajás
 - Antes de traducir una pantalla a código, si tenés acceso al MCP de Figma, consultalo para traer el diseño real en vez de asumir el layout.
