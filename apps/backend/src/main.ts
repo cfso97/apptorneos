@@ -7,6 +7,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
+  app.enableCors({
+    // En producción solo se permite FRONTEND_URL. En desarrollo se acepta
+    // cualquier puerto de localhost, porque Next.js cambia de puerto
+    // automáticamente cuando el 3000/3001 ya están ocupados en la máquina.
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? process.env.FRONTEND_URL
+        : [process.env.FRONTEND_URL ?? 'http://localhost:3000', /^http:\/\/localhost:\d+$/],
+    credentials: true,
+  });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const swaggerConfig = new DocumentBuilder()

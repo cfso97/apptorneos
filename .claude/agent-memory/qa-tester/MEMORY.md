@@ -1,2 +1,4 @@
 - [Convenciones de test del backend](backend_test_conventions.md) — naming de archivos spec/e2e y estilo de import de supertest en este repo.
 - [Cobertura razonable para health check](health_check_test_coverage.md) — criterio de cobertura mínima para endpoints triviales en Fase 0, sin inventar casos de negocio.
+- [Setup de entorno antes de testear](backend_env_setup_before_tests.md) — correr `pnpm install` + `pnpm prisma:generate` antes de diagnosticar fallos de test como bugs de código.
+- [Bloqueo de e2e por Docker](backend_docker_e2e_bloqueo.md) — qué suites e2e necesitan Postgres real y cómo se ven cuando Docker no está corriendo (no es bug de código).

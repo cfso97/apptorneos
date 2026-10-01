@@ -1,0 +1,1 @@
+- [next lint falla en Windows](next_lint_windows_quirk.md) — "next lint" tira error de spawn espurio en esta máquina; usar eslint.CMD directo para la señal real
