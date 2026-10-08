@@ -59,6 +59,8 @@ describe('AuthService', () => {
     email: 'jugador@example.com',
     nombre: 'Jugador Uno',
     fechaNacimiento: new Date('2000-01-01'),
+    tipoDocumento: 'CC',
+    numeroDocumento: '1000000001',
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
   };
 
@@ -77,18 +79,30 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('crea el usuario cuando el email no está registrado', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+    const registerDto = {
+      email: baseUser.email,
+      password: 'unaContraseñaSegura123',
+      nombre: baseUser.nombre,
+      fechaNacimiento: '2000-01-01',
+      tipoDocumento: baseUser.tipoDocumento,
+      numeroDocumento: baseUser.numeroDocumento,
+    };
+
+    it('crea el usuario cuando el documento y el email son nuevos', async () => {
+      prisma.user.findUnique.mockResolvedValue(null); // ni por documento ni por email hay coincidencia
       prisma.user.create.mockResolvedValue({ ...baseUser, passwordHash: 'hash' });
 
-      const resultado = await service.register({
-        email: baseUser.email,
-        password: 'unaContraseñaSegura123',
-        nombre: baseUser.nombre,
-        fechaNacimiento: '2000-01-01',
-      });
+      const resultado = await service.register(registerDto);
 
       expect(prisma.user.create).toHaveBeenCalledTimes(1);
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          email: baseUser.email,
+          nombre: baseUser.nombre,
+          tipoDocumento: baseUser.tipoDocumento,
+          numeroDocumento: baseUser.numeroDocumento,
+        }),
+      });
       expect(resultado).toEqual({
         id: baseUser.id,
         email: baseUser.email,
@@ -99,33 +113,73 @@ describe('AuthService', () => {
       expect(resultado).not.toHaveProperty('passwordHash');
     });
 
-    it('rechaza el registro con un email ya usado (código email_ya_registrado)', async () => {
-      prisma.user.findUnique.mockResolvedValue({ ...baseUser, passwordHash: 'hash' });
+    it('reclama un perfil sombra existente (documento sin email) sin tocar nombre/fechaNacimiento', async () => {
+      const sombra = {
+        id: 'user-sombra',
+        email: null,
+        passwordHash: null,
+        nombre: 'Nombre Pre-Registrado Por La Organización',
+        fechaNacimiento: new Date('2012-03-14'),
+        tipoDocumento: baseUser.tipoDocumento,
+        numeroDocumento: baseUser.numeroDocumento,
+        createdAt: baseUser.createdAt,
+      };
+      prisma.user.findUnique.mockImplementation((args: { where: Record<string, unknown> }) => {
+        if (args.where.tipoDocumento_numeroDocumento) return Promise.resolve(sombra);
+        return Promise.resolve(null); // no hay otro usuario con ese email
+      });
+      prisma.user.update.mockResolvedValue({ ...sombra, email: baseUser.email, passwordHash: 'hash' });
+
+      const resultado = await service.register(registerDto);
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-sombra' },
+        data: { email: baseUser.email, passwordHash: expect.any(String) },
+      });
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      // El nombre/fechaNacimiento del resultado siguen siendo los del perfil
+      // sombra (pre-registrado por la organización), no los del DTO.
+      expect(resultado.nombre).toBe(sombra.nombre);
+      expect(resultado.fechaNacimiento).toBe(sombra.fechaNacimiento);
+      expect(resultado.email).toBe(baseUser.email);
+    });
+
+    it('rechaza con 409 documento_ya_registrado si el documento ya tiene email, aunque el email del DTO sea distinto', async () => {
+      prisma.user.findUnique.mockImplementation((args: { where: Record<string, unknown> }) => {
+        if (args.where.tipoDocumento_numeroDocumento) {
+          return Promise.resolve({ ...baseUser, email: 'ya-tiene-cuenta@example.com', passwordHash: 'hash' });
+        }
+        return Promise.resolve(null);
+      });
 
       await expect(
-        service.register({
-          email: baseUser.email,
-          password: 'unaContraseñaSegura123',
-          nombre: baseUser.nombre,
-          fechaNacimiento: '2000-01-01',
-        }),
+        service.register({ ...registerDto, email: 'otro-email-cualquiera@example.com' }),
       ).rejects.toMatchObject({
+        response: { code: 'documento_ya_registrado' },
+      });
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 409 email_ya_registrado si el documento es nuevo pero el email ya existe', async () => {
+      prisma.user.findUnique.mockImplementation((args: { where: Record<string, unknown> }) => {
+        if (args.where.tipoDocumento_numeroDocumento) return Promise.resolve(null);
+        return Promise.resolve({ ...baseUser, id: 'otro-usuario', passwordHash: 'hash' });
+      });
+
+      await expect(service.register(registerDto)).rejects.toMatchObject({
         response: { code: 'email_ya_registrado' },
       });
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
 
     it('propaga ConflictException como tipo de excepción', async () => {
-      prisma.user.findUnique.mockResolvedValue({ ...baseUser, passwordHash: 'hash' });
+      prisma.user.findUnique.mockImplementation((args: { where: Record<string, unknown> }) => {
+        if (args.where.tipoDocumento_numeroDocumento) return Promise.resolve(null);
+        return Promise.resolve({ ...baseUser, passwordHash: 'hash' });
+      });
 
-      await expect(
-        service.register({
-          email: baseUser.email,
-          password: 'unaContraseñaSegura123',
-          nombre: baseUser.nombre,
-          fechaNacimiento: '2000-01-01',
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.register(registerDto)).rejects.toBeInstanceOf(ConflictException);
     });
   });
 

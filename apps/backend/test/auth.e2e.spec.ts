@@ -12,7 +12,13 @@ describe('Auth (e2e, contra Postgres real)', () => {
   const emailPrincipal = `auth-e2e-${runId}-a@example.com`;
   const emailRotacion = `auth-e2e-${runId}-b@example.com`;
   const passwordOriginal = 'contraseñaSegura123';
+  const documentoPrincipal = `${runId}01`;
+  const documentoRotacion = `${runId}02`;
+  const documentoEmailDuplicado = `${runId}03`;
   const emailsCreados = [emailPrincipal, emailRotacion];
+  // Documentos de perfiles sombra creados directamente (sin pasar por
+  // /auth/register) que pueden quedar sin reclamar al terminar los tests.
+  const documentosCreados: string[] = [];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -30,6 +36,9 @@ describe('Auth (e2e, contra Postgres real)', () => {
     // Limpieza: no dejar usuarios de prueba en la base de datos de desarrollo.
     // onDelete: Cascade en refresh_tokens/password_reset_tokens se encarga del resto.
     await prisma.user.deleteMany({ where: { email: { in: emailsCreados } } });
+    // Los perfiles sombra que nunca se reclamaron (email null) no aparecen en
+    // emailsCreados — se limpian aparte por número de documento.
+    await prisma.user.deleteMany({ where: { numeroDocumento: { in: documentosCreados } } });
     await app.close();
   });
 
@@ -40,6 +49,8 @@ describe('Auth (e2e, contra Postgres real)', () => {
         password: passwordOriginal,
         nombre: 'Jugador E2E',
         fechaNacimiento: '2000-05-20',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoPrincipal,
       });
 
       expect(response.status).toBe(HttpStatus.CREATED);
@@ -50,11 +61,16 @@ describe('Auth (e2e, contra Postgres real)', () => {
     });
 
     it('rechaza un email duplicado con 409 y code email_ya_registrado', async () => {
+      // Documento distinto al ya reclamado, para aislar el rechazo al chequeo
+      // de email (si reusáramos documentoPrincipal, ya reclamado, el rechazo
+      // sería documento_ya_registrado en vez de email_ya_registrado).
       const response = await request(app.getHttpServer()).post('/auth/register').send({
         email: emailPrincipal,
         password: passwordOriginal,
         nombre: 'Jugador E2E',
         fechaNacimiento: '2000-05-20',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoEmailDuplicado,
       });
 
       expect(response.status).toBe(HttpStatus.CONFLICT);
@@ -70,6 +86,123 @@ describe('Auth (e2e, contra Postgres real)', () => {
 
       expect(response.status).toBe(HttpStatus.BAD_REQUEST);
       expect(response.body.error).toBeDefined();
+    });
+  });
+
+  describe('POST /auth/register — perfiles reclamables (documento)', () => {
+    const documentoDuplicado = `${runId}10`;
+    const emailDocA = `auth-e2e-${runId}-doc-a@example.com`;
+    const emailDocB = `auth-e2e-${runId}-doc-b@example.com`;
+    const documentoSombraReclamada = `${runId}11`;
+    const emailReclamo = `auth-e2e-${runId}-reclamo@example.com`;
+    const emailYaUsado = `auth-e2e-${runId}-ya-usado@example.com`;
+    const documentoDelDuenioReal = `${runId}12`;
+    const documentoSombraSinReclamar = `${runId}13`;
+
+    beforeAll(() => {
+      emailsCreados.push(emailDocA, emailDocB, emailReclamo, emailYaUsado);
+      documentosCreados.push(documentoSombraSinReclamar);
+    });
+
+    it('rechaza un documento duplicado con otro email (409 documento_ya_registrado)', async () => {
+      const primero = await request(app.getHttpServer()).post('/auth/register').send({
+        email: emailDocA,
+        password: passwordOriginal,
+        nombre: 'Doc A',
+        fechaNacimiento: '1995-01-01',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoDuplicado,
+      });
+      expect(primero.status).toBe(HttpStatus.CREATED);
+
+      const segundo = await request(app.getHttpServer()).post('/auth/register').send({
+        email: emailDocB,
+        password: passwordOriginal,
+        nombre: 'Doc B (intento con otro email)',
+        fechaNacimiento: '1995-01-01',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoDuplicado,
+      });
+
+      expect(segundo.status).toBe(HttpStatus.CONFLICT);
+      expect(segundo.body.error.code).toBe('documento_ya_registrado');
+    });
+
+    it('flujo completo: reclama un perfil sombra pre-registrado y puede iniciar sesión', async () => {
+      // Simula lo que MembershipsService.invite en modo documento crearía:
+      // un perfil sin email/contraseña, con nombre/fechaNacimiento fijados
+      // por la organización.
+      await prisma.user.create({
+        data: {
+          tipoDocumento: 'CC',
+          numeroDocumento: documentoSombraReclamada,
+          nombre: 'Menor Pre-Registrado Por La Organización',
+          fechaNacimiento: new Date('2012-03-14'),
+        },
+      });
+
+      const registro = await request(app.getHttpServer()).post('/auth/register').send({
+        email: emailReclamo,
+        password: passwordOriginal,
+        nombre: 'Nombre Que Intenta Poner Quien Reclama',
+        fechaNacimiento: '2000-01-01',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoSombraReclamada,
+      });
+
+      expect(registro.status).toBe(HttpStatus.CREATED);
+      expect(registro.body.data.email).toBe(emailReclamo);
+      // nombre/fechaNacimiento son los del perfil sombra original, no los del
+      // intento de registro — la organización que pre-registró es la fuente
+      // de verdad de esos datos.
+      expect(registro.body.data.nombre).toBe('Menor Pre-Registrado Por La Organización');
+
+      const login = await request(app.getHttpServer()).post('/auth/login').send({
+        email: emailReclamo,
+        password: passwordOriginal,
+      });
+      expect(login.status).toBe(HttpStatus.OK);
+      expect(login.body.data.user.email).toBe(emailReclamo);
+    });
+
+    it('rechaza reclamar con un email ya usado por otra cuenta (409) y el perfil sombra sigue sin email', async () => {
+      // emailYaUsado ya pertenece a otra cuenta real, con su propio documento.
+      const registroDuenioReal = await request(app.getHttpServer()).post('/auth/register').send({
+        email: emailYaUsado,
+        password: passwordOriginal,
+        nombre: 'Dueño Real De Ese Email',
+        fechaNacimiento: '1990-01-01',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoDelDuenioReal,
+      });
+      expect(registroDuenioReal.status).toBe(HttpStatus.CREATED);
+      documentosCreados.push(documentoDelDuenioReal);
+
+      await prisma.user.create({
+        data: {
+          tipoDocumento: 'CC',
+          numeroDocumento: documentoSombraSinReclamar,
+          nombre: 'Otro Menor Pre-Registrado',
+          fechaNacimiento: new Date('2013-05-01'),
+        },
+      });
+
+      const intento = await request(app.getHttpServer()).post('/auth/register').send({
+        email: emailYaUsado,
+        password: passwordOriginal,
+        nombre: 'Quien Intenta Reclamar Con Email Ajeno',
+        fechaNacimiento: '2013-05-01',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoSombraSinReclamar,
+      });
+
+      expect(intento.status).toBe(HttpStatus.CONFLICT);
+      expect(intento.body.error.code).toBe('email_ya_registrado');
+
+      const sombraEnDb = await prisma.user.findUnique({
+        where: { tipoDocumento_numeroDocumento: { tipoDocumento: 'CC', numeroDocumento: documentoSombraSinReclamar } },
+      });
+      expect(sombraEnDb?.email).toBeNull();
     });
   });
 
@@ -134,6 +267,8 @@ describe('Auth (e2e, contra Postgres real)', () => {
         password: passwordOriginal,
         nombre: 'Jugador Rotación',
         fechaNacimiento: '2001-08-15',
+        tipoDocumento: 'CC',
+        numeroDocumento: documentoRotacion,
       });
 
       const loginResponse = await request(app.getHttpServer()).post('/auth/login').send({

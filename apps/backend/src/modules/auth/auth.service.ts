@@ -12,7 +12,7 @@ const BCRYPT_SALT_ROUNDS = 10;
 
 export interface SanitizedUser {
   id: string;
-  email: string;
+  email: string | null;
   nombre: string;
   fechaNacimiento: Date;
   createdAt: Date;
@@ -20,8 +20,8 @@ export interface SanitizedUser {
 
 interface UserRecord {
   id: string;
-  email: string;
-  passwordHash: string;
+  email: string | null;
+  passwordHash: string | null;
   nombre: string;
   fechaNacimiento: Date;
   createdAt: Date;
@@ -43,9 +43,23 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<SanitizedUser> {
-    const existente = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const porDocumento = await this.prisma.user.findUnique({
+      where: { tipoDocumento_numeroDocumento: { tipoDocumento: dto.tipoDocumento, numeroDocumento: dto.numeroDocumento } },
+    });
 
-    if (existente) {
+    // Si el documento ya tiene cuenta reclamada (email seteado), se rechaza
+    // SIEMPRE — sin importar qué email nuevo venga en el formulario. Esto es
+    // lo que evita que alguien reclame un documento que ya tiene cuenta real.
+    if (porDocumento?.email) {
+      throw new ConflictException({
+        code: 'documento_ya_registrado',
+        message: 'Ya existe una cuenta asociada a ese documento. Inicia sesión o recupera tu acceso.',
+      });
+    }
+
+    const porEmail = await this.prisma.user.findUnique({ where: { email: dto.email } });
+
+    if (porEmail) {
       throw new ConflictException({
         code: 'email_ya_registrado',
         message: 'Ya existe una cuenta con ese email.',
@@ -54,14 +68,24 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        nombre: dto.nombre,
-        fechaNacimiento: new Date(dto.fechaNacimiento),
-      },
-    });
+    const user = porDocumento
+      ? // Reclamo de perfil sombra: completa la MISMA fila con email+passwordHash.
+        // nombre/fechaNacimiento NO se tocan — la organización que pre-registró
+        // es la fuente de verdad de esos datos.
+        await this.prisma.user.update({
+          where: { id: porDocumento.id },
+          data: { email: dto.email, passwordHash },
+        })
+      : await this.prisma.user.create({
+          data: {
+            email: dto.email,
+            passwordHash,
+            nombre: dto.nombre,
+            fechaNacimiento: new Date(dto.fechaNacimiento),
+            tipoDocumento: dto.tipoDocumento,
+            numeroDocumento: dto.numeroDocumento,
+          },
+        });
 
     return this.sanitizeUser(user);
   }
@@ -69,15 +93,18 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthTokens & { user: SanitizedUser }> {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
-      // Mismo mensaje exista o no el email, para no revelar qué cuentas existen.
+    if (!user?.passwordHash || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+      // Mismo mensaje exista o no el email (o si el perfil todavía es una
+      // sombra sin contraseña), para no revelar qué cuentas existen.
       throw new UnauthorizedException({
         code: 'credenciales_invalidas',
         message: 'Email o contraseña incorrectos.',
       });
     }
 
-    const tokens = await this.issueTokens(user.id, user.email);
+    // dto.email (no user.email) porque en este punto ya sabemos que son el
+    // mismo valor, pero dto.email está tipado `string`, no `string | null`.
+    const tokens = await this.issueTokens(user.id, dto.email);
 
     return { ...tokens, user: this.sanitizeUser(user) };
   }
@@ -113,7 +140,12 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
 
-    if (!user) {
+    // Un refresh token solo se emite en login (issueTokens), y login exige
+    // passwordHash+email seteados — así que un usuario con refresh token
+    // vigente siempre debería tener email. Si no lo tiene (perfil sombra sin
+    // reclamar cuya sesión sobrevivió por alguna razón inesperada), se trata
+    // igual que "usuario ya no existe": no hay con qué firmar el JWT.
+    if (!user?.email) {
       throw new UnauthorizedException({
         code: 'refresh_token_invalido',
         message: 'La sesión no es válida, inicia sesión de nuevo.',

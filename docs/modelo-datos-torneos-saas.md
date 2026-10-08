@@ -43,7 +43,7 @@ Estos cinco patrones se repiten a lo largo de todo el modelo — entenderlos aqu
 
 | Tabla | Propósito |
 |---|---|
-| `users` | Identidad global de cualquier persona en el sistema (jugador, coach, admin). Sin `tenant_id`. |
+| `users` | Identidad global de cualquier persona en el sistema (jugador, coach, admin). Sin `tenant_id`. `email`/`password_hash` son opcionales y `tipo_documento`+`numero_documento` son únicos como pareja — ver "Perfiles reclamables" más abajo. |
 | `organizations` | El tenant — escuela, club, liga, organizador de torneos. |
 | `memberships` | Relación N:N entre usuario y organización, con rol y estado. Aquí sí vive el aislamiento multi-tenant (RLS de Postgres filtra por `organization_id` a través de esta tabla y de lo que cuelga de ella). |
 | `permissions` / `role_permissions` | Catálogo de acciones del sistema y qué rol las tiene por defecto. Evita `if (rol === 'admin')` regado por el código. |
@@ -51,6 +51,14 @@ Estos cinco patrones se repiten a lo largo de todo el modelo — entenderlos aqu
 | `password_reset_tokens` | Soporte de autenticación (Fase 0, agregada durante la implementación). Sostiene el flujo de "¿Olvidó su contraseña?": un token opaco de un solo uso (`used_at`), con expiración, que al consumirse en `/auth/reset-password` revoca además todos los `refresh_tokens` activos del usuario (cierre de sesión en todos los dispositivos). |
 
 **Auth:** JWT lleva solo `user_id`. Cada request que toca datos de una organización especifica `organization_id` (URL/header) y el backend valida contra `memberships` el acceso y el rol vigente. El JWT de acceso es de corta duración (`JWT_ACCESS_EXPIRES_IN`, ~15 min) — la sesión se mantiene renovando vía `/auth/refresh` con el refresh token opaco (`JWT_REFRESH_EXPIRES_IN`, ~30 días), que vive hasheado en `refresh_tokens`.
+
+**Perfiles reclamables (agregado tras Fase 1, junto con el documento de identidad):** todo `user` lleva ahora un documento de identidad genérico (`tipo_documento` + `numero_documento`, únicos como pareja — no específico de un país, para que el modelo escale a otros mercados). Esto habilita que una organización "pre-registre" un jugador (típicamente menor de edad) dando solo nombre, fecha de nacimiento y documento, **sin que esa persona tenga cuenta todavía** (`POST .../memberships/invite` en modo documento, ver sección 16 — crea la fila de `users` con `email`/`password_hash` en `null`, un "perfil sombra"). Por eso `email` y `password_hash` pasaron de obligatorios a opcionales.
+
+Cuando esa persona se registra por su cuenta (`POST /auth/register`) con el mismo `tipo_documento`+`numero_documento`, el backend detecta la coincidencia y completa la MISMA fila con el `email`/`password_hash` del formulario, en vez de crear un usuario nuevo — así conserva cualquier `membership`/historial ya asociado a ese `id`. `nombre`/`fecha_nacimiento` del perfil sombra NO se sobrescriben con lo que traiga el formulario de registro: la organización que pre-registró es la fuente de verdad de esos datos hasta que se construya un flujo explícito de edición de perfil.
+
+**Regla de seguridad central:** si el documento ya tiene `email` seteado (cuenta ya reclamada por alguien), un nuevo intento de registro con ese mismo documento se rechaza siempre con 409 `documento_ya_registrado` — sin importar qué email nuevo traiga el formulario. Esto evita que alguien "robe" un perfil ajeno ya reclamado adivinando o reutilizando su número de documento.
+
+**Pendiente a propósito (sin fecha):** recuperar acceso o cambiar el email registrado usando el documento como prueba de identidad — depende de definir el proveedor de verificación (WhatsApp) antes de construirlo, para no dejar un mecanismo de account recovery débil.
 
 ---
 
@@ -277,7 +285,9 @@ Se recomienda instrumentar esto desde el MVP en las acciones más sensibles (edi
 
 Catálogo de `permissions` agrupado por módulo, y su asignación por defecto en `role_permissions`. Esta tabla es la que consulta el guard/decorator centralizado del backend (`@RequierePermiso(...)`) antes de ejecutar cualquier endpoint sensible — con cache en Redis, porque se valida en cada request.
 
-**Catálogo — Torneos (core):** `crear_torneo`, `editar_torneo`, `editar_organizacion`, `configurar_requisitos`, `configurar_fases`, `aprobar_inscripcion`, `rechazar_inscripcion`, `editar_resultado`, `confirmar_resultado`, `resolver_disputa`, `registrar_evento_partido`, `descalificar_participante`, `reemplazar_participante`, `aplicar_sancion`, `ver_recaudos`, `registrar_pago`, `registrar_reembolso`, `asignar_arbitro`, `ver_estadisticas`, `generar_carnet`.
+**Catálogo — Torneos (core):** `crear_torneo`, `editar_torneo`, `editar_organizacion`, `gestionar_membresias`, `configurar_requisitos`, `configurar_fases`, `aprobar_inscripcion`, `rechazar_inscripcion`, `editar_resultado`, `confirmar_resultado`, `resolver_disputa`, `registrar_evento_partido`, `descalificar_participante`, `reemplazar_participante`, `aplicar_sancion`, `ver_recaudos`, `registrar_pago`, `registrar_reembolso`, `asignar_arbitro`, `ver_estadisticas`, `generar_carnet`.
+
+`gestionar_membresias` (Fase 1) cubre invitar/listar/cambiar rol-estado de miembros de la organización — separado de `editar_organizacion` (que solo edita los datos generales de la organización), mismo criterio ya aplicado a `editar_torneo` vs `editar_organizacion` en Fase 0.
 
 **Catálogo — Equipos:** `editar_plantilla`, `invitar_jugador_equipo`, `inscribir_equipo_torneo`, `convocar_jugadores_torneo`.
 
@@ -289,7 +299,9 @@ Catálogo de `permissions` agrupado por módulo, y su asignación por defecto en
 
 **Catálogo — Canchas** (reservado, fase 2): `registrar_cancha`, `editar_reserva`, `administrar_costos_cancha`.
 
-**Catálogo — Plataforma** (reservado, futuro super-admin): `gestionar_organizaciones`, `gestionar_planes`, `ver_metricas_globales` — acceso cross-tenant, única excepción intencional a RLS.
+**Catálogo — Plataforma** (reservado, futuro super-admin): `gestionar_organizaciones`, `gestionar_planes`, `ver_metricas_globales` — acceso cross-tenant, única excepción intencional a RLS a nivel de rol de plataforma.
+
+**Otra excepción controlada a RLS (Fase 1, acotada y sin exponer filas):** un `admin_org` necesita poder confirmar que comparte organización con un menor para gestionar a su acudiente (`/users/{userId}/guardians`), aunque `user_guardians` no tiene `organization_id` ni RLS. Se resuelve con una función de Postgres `user_shares_admin_org(p_admin_user_id, p_target_user_id) RETURNS boolean`, marcada `SECURITY DEFINER` (se ejecuta con los privilegios de quien la creó, no de `app_runtime`, así que puede leer `memberships` sin que la política de RLS se lo impida) — pero solo devuelve un booleano, nunca expone filas de otras organizaciones. `GuardianAccessGuard` la consulta vía `$queryRaw` con el `PrismaService` base. Ver la migración `fase1_rls_setup` para el SQL exacto.
 
 **Matriz rol × permiso (módulos Torneos + Equipos, alcance MVP):**
 
@@ -297,6 +309,7 @@ Catálogo de `permissions` agrupado por módulo, y su asignación por defecto en
 |---|:---:|:---:|:---:|:---:|:---:|
 | crear_torneo / editar_torneo | ✅ | ❌ | ❌ | ❌ | ❌ |
 | editar_organizacion | ✅ | ❌ | ❌ | ❌ | ❌ |
+| gestionar_membresias | ✅ | ❌ | ❌ | ❌ | ❌ |
 | configurar_requisitos / configurar_fases | ✅ | ❌ | ❌ | ❌ | ❌ |
 | aprobar_inscripcion / rechazar_inscripcion | ✅ | ❌ | ❌ | ❌ | ❌ |
 | editar_resultado | ✅ | ❌ | ❌ | ❌ | ✅ (solo si tiene `user_id`) |

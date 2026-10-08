@@ -1,0 +1,24 @@
+---
+name: project-fase1-organizaciones-implementation
+description: Decisiones y estado de Fase 1 (Identidad y organizaciones) — RLS real con app_runtime, TenantPrismaService, GuardianAccessGuard, y qué falta que Cristian aplique
+metadata:
+  type: project
+---
+
+Implementación de Fase 1 ("Identidad y organizaciones") completada en código el 2026-09-23, siguiendo el plan `wiggly-hopping-journal.md` (ya aprobado por Cristian). Ver [[feedback-migration-authorization]] para por qué la migración NO se aplicó en esta sesión.
+
+**Modelos agregados a `schema.prisma`:** `Organization`, `Membership`, `UserGuardian`, `AuditLog`. `Organization`/`Membership`/`AuditLog` llevan RLS real; `UserGuardian` no (relación global usuario-usuario). `Membership` tiene `@@unique([userId, organizationId])` — desviación documentada del ERD para que re-invitar reutilice la fila existente.
+
+**Decisión de seguridad central — RLS real, dos roles de Postgres:** `DATABASE_URL` (superusuario, ya existía) queda solo para `prisma migrate`/`seed.ts`. Se agrega `RUNTIME_DATABASE_URL`, con el que `PrismaService` (el cliente que usa la API en ejecución) se conecta como `app_runtime` (rol sin privilegios de superusuario, creado en la migración manual de RLS). `PrismaService` lanza error al arrancar si `RUNTIME_DATABASE_URL` no está seteada — falla segura para que nunca corra por accidente con el superusuario, que se saltaría RLS.
+
+**Mecanismo Prisma↔RLS — `TenantPrismaService.run(ctx, fn, organizationIdOverride?)`:** abre una transacción corta de Prisma por operación, hace `SELECT set_config('app.current_user_id', ...)` y `set_config('app.current_organization_id', ...)` (ambos `SET LOCAL`, parametrizados vía `$executeRaw` con template tag — nunca concatenando strings) y ejecuta el callback dentro. Se descartó una transacción abierta por todo el request (vía middleware/AsyncLocalStorage) por frágil. Si no hay `organizationId`, simplemente no se fija esa variable de sesión — como es `SET LOCAL`, una transacción nueva nunca hereda el valor de una anterior en la misma conexión, así que el default es bloquear (RLS sin contexto = 0 filas), nunca "todas las filas".
+
+**`RequierePermisoGuard` (segundo `APP_GUARD`, después de `JwtAuthGuard`):** resuelve `organizationId` de la ruta (`params.orgId ?? params.id`), valida UUID, busca membresía activa vía `TenantPrismaService`, y si hay `@RequierePermiso(codigo)` verifica el permiso contra `PermissionsService` (cache en memoria, TTL 5 min — no Redis todavía, ver nota en el código). `@SkipMembershipCheck()` se usa solo en `POST .../memberships/{id}/accept` (el usuario está en estado `invitado`, no `activo`, hasta ese mismo endpoint).
+
+**Excepción controlada a RLS — `user_shares_admin_org`:** función Postgres `SECURITY DEFINER` (se ejecuta con privilegios de quien la creó, no de `app_runtime`) que responde sí/no a si un admin_org comparte organización con un usuario — nunca expone filas. La consume `GuardianAccessGuard` (guard local de `/users/:userId/guardians`, que NO pasa por `RequierePermisoGuard` de forma efectiva porque esa ruta no tiene `orgId`/`id` en los params).
+
+**Generador de código de jugador (`generarCodigoJugador.util.ts`, compartido entre `OrganizationsService.create` y `MembershipsService.invite`):** `UPDATE organizations SET siguiente_secuencia = siguiente_secuencia + 1 ... RETURNING` — el lock de fila serializa altas concurrentes sin duplicar código. Verificado con un test e2e de 10 invitaciones en paralelo (pendiente de correr contra DB real, ver abajo).
+
+**Bloqueador de esta sesión — no se aplicó ninguna migración:** por la regla de CLAUDE.md ("solo Cristian corre migrate/edita migraciones"), se dejaron sin ejecutar: (1) `prisma migrate dev --name fase1_identidad_organizaciones` (tablas nuevas, que Prisma genera solo) y (2) la migración manual `fase1_rls_setup` (rol `app_runtime`, políticas RLS, función `user_shares_admin_org`) — el SQL completo de esta última quedó en un archivo de scratchpad de la sesión, NO en `prisma/migrations/`, para que Cristian lo pegue él mismo al crear la migración con `--create-only`. Consecuencia: los 3 archivos e2e nuevos (`organizations.e2e.spec.ts`, `memberships.e2e.spec.ts`, `guardians.e2e.spec.ts`) están escritos pero no se pudieron correr contra Postgres real todavía (fallan con error de autenticación porque el rol `app_runtime` no existe aún) — sí se verificó que compilan y que el único error que producen es la falla de conexión esperada. Los 75 tests unitarios (mockeados, sin DB) sí corren y pasan, y `pnpm lint`/`pnpm build` están limpios.
+
+**Nota sobre el ERD:** `docs/erd-torneos-saas.mermaid` ya traía las 4 tablas de esta fase (`ORGANIZATIONS`, `MEMBERSHIPS`, `USER_GUARDIANS`, `AUDIT_LOG`) con sus relaciones desde el diseño inicial — no fue necesario tocarlo, solo se verificó que los campos coincidieran con el schema.prisma final.

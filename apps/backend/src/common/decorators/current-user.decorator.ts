@@ -3,7 +3,10 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 /** Lo que `JwtStrategy.validate()` deja en `request.user` tras verificar el JWT. */
 export interface AuthenticatedUser {
   userId: string;
-  email: string;
+  /** Null solo sería posible para un perfil sombra sin reclamar — en la
+   * práctica nunca llega hasta acá porque un JWT solo se emite en login,
+   * que exige email+passwordHash seteados (ver AuthService.login). */
+  email: string | null;
 }
 
 /**

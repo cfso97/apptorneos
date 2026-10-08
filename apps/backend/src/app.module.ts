@@ -5,17 +5,33 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RequierePermisoGuard } from './common/guards/requiere-permiso.guard';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { PermissionsModule } from './common/permissions/permissions.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { GuardiansModule } from './modules/guardians/guardians.module';
+import { MembershipsModule } from './modules/memberships/memberships.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, AuthModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    PermissionsModule,
+    AuthModule,
+    OrganizationsModule,
+    MembershipsModule,
+    GuardiansModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
-    // Guard global: seguro por defecto, las rutas públicas se marcan con @Public().
+    // Guard global 1: seguro por defecto, las rutas públicas se marcan con @Public().
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Guard global 2: debe correr DESPUÉS de JwtAuthGuard (deja request.user
+    // listo primero). Resuelve membresía + permiso por organización (Fase 1).
+    { provide: APP_GUARD, useClass: RequierePermisoGuard },
     // Envelope {data, meta} en éxito.
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     // Envelope {error: {code, message}} en fallo.

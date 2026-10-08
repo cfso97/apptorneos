@@ -4,13 +4,13 @@
 // sección 19). Idempotente: se puede correr varias veces sin duplicar datos.
 
 import { PrismaClient } from '@prisma/client';
+import { PLAN_PLACEHOLDER_ID, SPORT_FUTBOL_ID } from '../src/common/constants/seed-ids.constant';
 
 const prisma = new PrismaClient();
 
-// IDs fijos para que el seed sea idempotente sin depender de un campo único
-// adicional en `plans`/`sports` (que hoy no lo tienen en el esquema).
-const PLAN_PLACEHOLDER_ID = '00000000-0000-0000-0000-000000000001';
-const SPORT_FUTBOL_ID = '00000000-0000-0000-0000-000000000002';
+// IDs fijos (importados de `seed-ids.constant.ts`, que también consume
+// `OrganizationsService`) para que el seed sea idempotente sin depender de un
+// campo único adicional en `plans`/`sports` (que hoy no lo tienen en el esquema).
 
 interface PermisoSeed {
   codigo: string;
@@ -22,6 +22,10 @@ const PERMISOS: PermisoSeed[] = [
   { codigo: 'crear_torneo', modulo: 'torneos' },
   { codigo: 'editar_torneo', modulo: 'torneos' },
   { codigo: 'editar_organizacion', modulo: 'torneos' },
+  // Fase 1: gestión de membresías (invitar/listar/cambiar rol-estado),
+  // separado de editar_organizacion por el mismo criterio ya aplicado a
+  // editar_torneo vs editar_organizacion en Fase 0.
+  { codigo: 'gestionar_membresias', modulo: 'torneos' },
   { codigo: 'configurar_requisitos', modulo: 'torneos' },
   { codigo: 'configurar_fases', modulo: 'torneos' },
   { codigo: 'aprobar_inscripcion', modulo: 'torneos' },
@@ -77,6 +81,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'crear_torneo',
     'editar_torneo',
     'editar_organizacion',
+    'gestionar_membresias',
     'configurar_requisitos',
     'configurar_fases',
     'aprobar_inscripcion',

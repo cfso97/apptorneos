@@ -2,9 +2,18 @@
 // Refleja docs/modelo-datos-torneos-saas.md y docs/erd-torneos-saas.mermaid.
 // Fase 0 (Fundacional): identidad global de usuario, catálogos semilla
 // (permissions/role_permissions, plans, sports) y tablas de soporte de auth
-// (refresh_tokens, password_reset_tokens). Los modelos de organizaciones,
-// membresías y el resto del dominio se agregan a partir de la Fase 1.
-// No se edita a mano fuera de una migración (Prisma Migrate).
+// (refresh_tokens, password_reset_tokens).
+// Fase 1 (Identidad y organizaciones): Organization, Membership,
+// UserGuardian, AuditLog. `Organization`, `Membership` y `AuditLog` llevan
+// Row-Level Security real de Postgres (ver migración de RLS escrita a mano
+// con `prisma migrate dev --create-only`) — el aislamiento multi-tenant lo
+// garantiza la base de datos, no un filtro manual en cada servicio.
+// `UserGuardian` es una relación global usuario-usuario (sin
+// `organization_id`) y no lleva RLS.
+// No se edita a mano fuera de una migración (Prisma Migrate). El SQL de
+// políticas RLS, por su impacto de seguridad, siempre se revisa a mano antes
+// de aplicarlo — el resto de las migraciones (tablas/columnas) se generan
+// normalmente con Prisma Migrate como cualquier otro cambio de código.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,18 +27,40 @@ datasource db {
 /// Identidad global de cualquier persona en el sistema (jugador, coach, admin).
 /// Sin organization_id — la pertenencia a una organización vive en `memberships`
 /// (Fase 1), no como propiedad fija del usuario.
+///
+/// Perfiles reclamables: `email`/`passwordHash` son opcionales para soportar
+/// el "perfil sombra" — una organización puede pre-registrar a un jugador con
+/// solo nombre/fechaNacimiento/documento (sin cuenta ni login todavía) vía
+/// `MembershipsService.invite` en modo documento. Cuando esa persona se
+/// registra por su cuenta (`POST /auth/register`) con el mismo
+/// tipoDocumento+numeroDocumento, `AuthService.register` completa la MISMA
+/// fila con email+passwordHash en vez de crear un usuario nuevo — conserva el
+/// historial (memberships, etc.) ya asociado a ese `id`. Si el documento ya
+/// tiene `email` seteado (cuenta ya reclamada), un nuevo intento de registro
+/// con ese documento se rechaza siempre (409 `documento_ya_registrado`),
+/// exista o no coincidencia de email, para que nadie pueda "robarse" un
+/// perfil ajeno ya reclamado.
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  email           String    @unique
-  passwordHash    String    @map("password_hash")
-  nombre          String
-  fechaNacimiento DateTime  @map("fecha_nacimiento") @db.Date
-  perfilPublico   Json?     @map("perfil_publico")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id               String   @id @default(uuid()) @db.Uuid
+  email            String?  @unique
+  passwordHash     String?  @map("password_hash")
+  nombre           String
+  fechaNacimiento  DateTime @map("fecha_nacimiento") @db.Date
+  tipoDocumento    String   @map("tipo_documento")
+  numeroDocumento  String   @map("numero_documento")
+  perfilPublico    Json?    @map("perfil_publico")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  memberships         Membership[]
+  auditLogs           AuditLog[]
+  /// Filas de `user_guardians` donde este usuario ES el menor (sus acudientes).
+  minorGuardians      UserGuardian[]       @relation("MinorGuardians")
+  /// Filas de `user_guardians` donde este usuario ES el acudiente (de qué menores es responsable).
+  guardianOfRecords   UserGuardian[]       @relation("GuardianOfRecords")
 
+  @@unique([tipoDocumento, numeroDocumento])
   @@map("users")
 }
 
@@ -63,6 +94,8 @@ model Plan {
   id         String  @id @default(uuid()) @db.Uuid
   nombre     String
   precioBase Decimal @map("precio_base") @db.Decimal(10, 2)
+
+  organizations Organization[]
 
   @@map("plans")
 }
@@ -111,4 +144,96 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// El tenant — escuela, club, liga, organizador de torneos (sección 2 de
+/// modelo-datos-torneos-saas.md, Fase 1). Lleva RLS real: una fila solo es
+/// visible/escribible cuando `id` coincide con el `organization_id` que el
+/// backend fija en la transacción vía `TenantPrismaService` (ver migración
+/// de RLS, escrita a mano por Cristian).
+model Organization {
+  id                   String   @id @default(uuid()) @db.Uuid
+  nombre               String
+  tipo                 String
+  planId               String   @map("plan_id") @db.Uuid
+  prefijoCodigoJugador String   @map("prefijo_codigo_jugador")
+  /// Contador usado por el generador de código de jugador (ej. ORG-0001).
+  /// Se incrementa con `UPDATE ... RETURNING` para serializar altas
+  /// concurrentes sin duplicar código (ver generarCodigoJugador.util.ts).
+  siguienteSecuencia   Int      @default(0) @map("siguiente_secuencia")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  plan        Plan         @relation(fields: [planId], references: [id])
+  memberships Membership[]
+  auditLogs   AuditLog[]
+
+  @@map("organizations")
+}
+
+/// Relación N:N entre usuario y organización (sección 2) — rol, estado
+/// (`invitado -> activo -> inactivo/removido`) y código de jugador propio de
+/// esa organización. Lleva RLS real por `organization_id`.
+///
+/// Desviación documentada del ERD: se agrega `@@unique([userId, organizationId])`
+/// para evitar membresías duplicadas del mismo usuario en la misma
+/// organización — re-invitar a alguien reutiliza la fila existente
+/// (ver `MembershipsService.invite`) en vez de crear una nueva.
+model Membership {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  rol            String
+  estado         String    @default("invitado")
+  codigoJugador  String    @map("codigo_jugador")
+  /// Nula hasta que la invitación se acepta (`POST .../accept`).
+  fechaIngreso   DateTime? @map("fecha_ingreso") @db.Date
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+/// Acudiente↔menor (sección 3 de modelo-datos-torneos-saas.md). Relación
+/// global usuario-usuario, sin `organization_id` — no lleva RLS. El acceso
+/// de un `admin_org` a los acudientes de un menor con el que comparte
+/// organización se resuelve con la función `user_shares_admin_org`
+/// (SECURITY DEFINER, ver migración de RLS) desde `GuardianAccessGuard`.
+model UserGuardian {
+  id                   String  @id @default(uuid()) @db.Uuid
+  minorUserId          String  @map("minor_user_id") @db.Uuid
+  guardianUserId       String  @map("guardian_user_id") @db.Uuid
+  relacion             String
+  esResponsablePagos   Boolean @default(false) @map("es_responsable_pagos")
+  esContactoEmergencia Boolean @default(false) @map("es_contacto_emergencia")
+
+  minor    User @relation("MinorGuardians", fields: [minorUserId], references: [id], onDelete: Cascade)
+  guardian User @relation("GuardianOfRecords", fields: [guardianUserId], references: [id], onDelete: Cascade)
+
+  @@unique([minorUserId, guardianUserId])
+  @@map("user_guardians")
+}
+
+/// Registro genérico de quién hizo qué en acciones administrativas sensibles
+/// (sección 16). Lleva RLS real por `organization_id`. Se instrumenta desde
+/// el propio servicio de negocio (`AuditService.registrar`, dentro de la
+/// misma transacción de la acción auditada), no vía interceptor genérico.
+model AuditLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  entidadTipo       String   @map("entidad_tipo")
+  entidadId         String   @map("entidad_id") @db.Uuid
+  accion            String
+  valoresAnteriores Json?    @map("valores_anteriores")
+  valoresNuevos     Json?    @map("valores_nuevos")
+  fecha             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("audit_log")
 }

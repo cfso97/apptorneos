@@ -12,7 +12,7 @@
 
 | Método | Ruta | Permiso | Descripción |
 |---|---|---|---|
-| POST | `/auth/register` | público | Crear cuenta de usuario |
+| POST | `/auth/register` | público | Crear cuenta de usuario. Exige `tipoDocumento`+`numeroDocumento` (además de email/password/nombre/fechaNacimiento). Si el documento ya existe como perfil sombra (sin email, pre-registrado por una organización vía `.../memberships/invite`), reclama esa misma cuenta en vez de crear una nueva — ver "Perfiles reclamables" en `modelo-datos-torneos-saas.md`. Si el documento ya tiene email (cuenta ya reclamada), responde 409 `documento_ya_registrado` sin importar el email enviado |
 | POST | `/auth/login` | público | Login, devuelve JWT + refresh token |
 | POST | `/auth/refresh` | público (requiere refresh token válido) | Renovar JWT (rota el refresh token; detecta y responde a reuso de un token ya revocado revocando todas las sesiones del usuario) |
 | POST | `/auth/logout` | autenticado | Invalidar el refresh token indicado en el body |
@@ -29,17 +29,22 @@
 |---|---|---|---|
 | POST | `/organizations` | autenticado | Crear organización (el creador queda como `admin_org`) |
 | GET | `/organizations/{id}` | miembro de la organización | Ver detalle de organización |
-| PATCH | `/organizations/{id}` | `editar_torneo`* → *ver nota* | Editar datos generales (nombre, tipo, prefijo de código de jugador) |
+| PATCH | `/organizations/{id}` | `editar_organizacion` | Editar datos generales (nombre, tipo, prefijo de código de jugador) — auditado |
 | GET | `/organizations/{id}/limits` | miembro de la organización | Ver límites del plan (jugadores, equipos, torneos) |
 | PATCH | `/organizations/{id}/modules/{moduleId}` | solo `platform_admin` (interno, manual en MVP) | Activar/desactivar módulo para la organización |
-| POST | `/organizations/{orgId}/memberships/invite` | `admin_org` | Invitar usuario a la organización con un rol |
-| GET | `/organizations/{orgId}/memberships` | `admin_org` | Listar miembros |
-| PATCH | `/organizations/{orgId}/memberships/{membershipId}` | `admin_org` | Cambiar rol/estado de un miembro |
-| GET | `/users/{userId}/guardians` | propio usuario o `admin_org` | Ver acudientes vinculados |
-| POST | `/users/{userId}/guardians` | propio usuario (mayor) o `admin_org` | Vincular acudiente a un menor |
-| DELETE | `/users/{userId}/guardians/{guardianId}` | propio usuario o `admin_org` | Desvincular acudiente |
+| POST | `/organizations/{orgId}/memberships/invite` | `gestionar_membresias` | Invitar a la organización con un rol. Dos modos exclusivos en el body (XOR, nunca ambos ni ninguno): modo A `{ email, rol }` para un usuario ya existente; modo B `{ tipoDocumento, numeroDocumento, nombre, fechaNacimiento, rol }` para crear (o reutilizar, si el documento ya existe) un "perfil sombra" sin cuenta todavía — ver "Perfiles reclamables" en `modelo-datos-torneos-saas.md` |
+| GET | `/organizations/{orgId}/memberships` | `gestionar_membresias` | Listar miembros |
+| PATCH | `/organizations/{orgId}/memberships/{membershipId}` | `gestionar_membresias` | Cambiar rol/estado de un miembro — auditado. No permite pasar directamente a `activo` desde `invitado` (ver `accept`) |
+| POST | `/organizations/{orgId}/memberships/{membershipId}/accept` | propio usuario invitado | Aceptar una invitación pendiente (`invitado` → `activo`, fija `fecha_ingreso`) |
+| GET | `/users/{userId}/guardians` | propio usuario o `admin_org` que comparte organización | Ver acudientes vinculados |
+| POST | `/users/{userId}/guardians` | propio usuario (mayor) o `admin_org` que comparte organización | Vincular acudiente a un menor |
+| DELETE | `/users/{userId}/guardians/{guardianId}` | propio usuario o `admin_org` que comparte organización | Desvincular acudiente |
 
-*Nota: se crea un permiso propio `editar_organizacion` en el catálogo, distinto de `editar_torneo` — se omitió en la matriz original de la sección 16.1, agregarlo ahí también.*
+**Notas:**
+- Se creó un permiso propio `editar_organizacion` en el catálogo, distinto de `editar_torneo`, y otro nuevo en esta fase, `gestionar_membresias` (invitar/listar/cambiar rol-estado de miembros), separado de `editar_organizacion` — ambos agregados a la matriz de la sección 16.1 de `modelo-datos-torneos-saas.md`.
+- `POST .../memberships/{membershipId}/accept` no estaba documentado en el diseño original — se agrega acá en el mismo cambio que lo implementa (mismo criterio ya aplicado a los endpoints de `forgot-password`/`reset-password` en Fase 0).
+- **Perfiles reclamables (agregado tras Fase 1):** código de error nuevo `documento_ya_registrado` (409) en `/auth/register`, para cuando el documento ya tiene una cuenta reclamada. Pendiente a propósito, sin fecha: recuperar acceso o cambiar de email usando el documento — depende de definir el proveedor de verificación (WhatsApp) antes de construirlo.
+- **Pendiente, fuera de esta entrega a propósito:** `GET /organizations/{id}/limits` y `PATCH /organizations/{id}/modules/{moduleId}` dependen de un flujo real de planes/facturación y de un rol `platform_admin` todavía sin diseñar (ver nota de "panel super-admin" coordinada para una sesión de planeación aparte) — quedan documentados como referencia de API objetivo, no implementados en Fase 1.
 
 ---
 
